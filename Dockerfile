@@ -11,11 +11,13 @@ RUN apt update -y && apt upgrade -y
 RUN apt install -y apt-utils
 RUN apt install -y build-essential
 RUN apt install -y gcc
+RUN apt install -y bc
 RUN apt install -y libncurses-dev
 RUN apt install -y gawk
 RUN apt install -y flex
 RUN apt install -y bison
 RUN apt install -y openssl
+RUN apt install -y qemu-system
 RUN apt install -y libssl-dev
 RUN apt install -y dkms
 RUN apt install -y libelf-dev
@@ -33,30 +35,35 @@ RUN python3 -m pip install --user git+https://github.com/systemd/mkosi.git
 
 # Fetch Kernel Sources
 FROM init as fetch
-RUN mkdir VM
 RUN git clone https://gitlab.com/fierce-lab/linux.git
 
 # Build root file system
-RUN cd linux
-#RUN cp scripts/memorizer/mkosi.default /VM
-#RUN cp scripts/memorizer/mkosi.postinst /VM
-#RUN cd ./VM
-#RUN mkosi
+WORKDIR linux
+RUN mkdir -p VM
+RUN sudo cp ./scripts/memorizer/mkosi.default VM/mkosi.default
+RUN cp ./scripts/memorizer/mkosi.postinst VM/mkosi.postinst
+WORKDIR  VM
+RUN sudo bash "/kernel/linux/scripts/memorizer/mkosi.default"
 
 
-# RUN wget https://cdn.kernel.org/pub/linux/kernel/v5.x/linux-5.15.11.tar.xz
-# RUN wget https://cdn.kernel.org/pub/linux/kernel/v5.x/linux-5.15.11.tar.sign
+RUN wget https://cdn.kernel.org/pub/linux/kernel/v5.x/linux-5.15.11.tar.xz
+RUN wget https://cdn.kernel.org/pub/linux/kernel/v5.x/linux-5.15.11.tar.sign
 
 # Build Kernel
-# FROM verify as compile
+#FROM verify as compile
 
-# RUN tar -xvf linux-5.15.11.tar
-# RUN cd linux-5.15.11 && make mrproper
-
+WORKDIR /kernel/linux/VM
+RUN tar -xvf linux-5.15.11.tar.xz
+WORKDIR linux-5.15.11 
+RUN cp /kernel/linux/scripts/memorizer/memorizer_config.config .config 
+RUN make -j$(nproc)
+RUN make -j$(nproc) modules_install
+WORKDIR /kernel/linux
+RUN sudo ./scripts/memorizer/run_qemu.sh ./VM/rootfs.raw
 # Build root file system
-# RUN mkdir VM
-# cp ./scripts/memorizer/mkosi.default ./VM
-# cp ./scripts/memorizer/mkosi.postinst ./VM
-# (cd ./VM && sudo mkosi)
+#RUN mkdir VM
+#COPY ./scripts/memorizer/mkosi.default ./VM
+#COPY ./scripts/memorizer/mkosi.postinst ./VM
+#(cd ./VM && sudo mkosi)
 
-# FROM compile
+#FROM compile
